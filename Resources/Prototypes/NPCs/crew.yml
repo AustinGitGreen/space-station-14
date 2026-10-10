@@ -1,0 +1,9 @@
+# Root behavior for NPC crew (see NpcCrewSystem).
+# Branches are tried top to bottom and the first one whose preconditions pass wins, so
+# job behaviors (repair damage, cook food, heal the wounded, respond to crime) belong above the idle fallback.
+- type: htnCompound
+  id: NpcCrewCompound
+  branches:
+    - tasks:
+        - !type:HTNCompoundTask
+          task: IdleCompound
