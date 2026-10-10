@@ -5,6 +5,7 @@ using Content.Server.NPC.HTN;
 using Content.Server.NPC.Systems;
 using Content.Shared.CCVar;
 using Content.Shared.GameTicking;
+using Content.Shared.Inventory;
 using Content.Shared.Movement.Components;
 using Content.Shared.NPC.Prototypes;
 using Content.Shared.NPC.Systems;
@@ -31,12 +32,33 @@ public sealed class NpcCrewSystem : EntitySystem
     [Dependency] private IGameTiming _timing = default!;
     [Dependency] private IRobustRandom _random = default!;
     [Dependency] private GameTicker _ticker = default!;
+    [Dependency] private InventorySystem _inventory = default!;
     [Dependency] private NPCSystem _npc = default!;
     [Dependency] private NpcFactionSystem _faction = default!;
     [Dependency] private StationSpawningSystem _spawning = default!;
     [Dependency] private StationSystem _station = default!;
 
-    private const string RootTask = "NpcCrewCompound";
+    private const string DefaultRootTask = "NpcCrewCompound";
+
+    /// <summary>
+    /// Jobs that get their own behavior instead of <see cref="DefaultRootTask"/>.
+    /// </summary>
+    private static readonly Dictionary<ProtoId<JobPrototype>, string> RootTasks = new()
+    {
+        ["MedicalDoctor"] = "NpcDoctorCompound",
+    };
+
+    /// <summary>
+    /// Items a job's NPC crew carry that their behavior relies on, by inventory slot.
+    /// </summary>
+    private static readonly Dictionary<ProtoId<JobPrototype>, (string Slot, EntProtoId Item)[]> ExtraGear = new()
+    {
+        ["MedicalDoctor"] =
+        [
+            ("pocket1", "Brutepack"),
+            ("pocket2", "Ointment"),
+        ],
+    };
 
     private static readonly ProtoId<NpcFactionPrototype> CrewFaction = "NanoTrasen";
 
@@ -112,7 +134,17 @@ public sealed class NpcCrewSystem : EntitySystem
         _faction.AddFaction(uid, CrewFaction);
 
         EnsureComp<NpcCrewComponent>(uid).Job = job;
-        AddComp<HTNComponent>(uid).RootTask = new HTNCompoundTask { Task = RootTask };
+
+        if (ExtraGear.TryGetValue(job, out var gear))
+        {
+            foreach (var (slot, item) in gear)
+            {
+                _inventory.SpawnItemInSlot(uid, slot, item, silent: true, force: true);
+            }
+        }
+
+        var rootTask = RootTasks.GetValueOrDefault(job, DefaultRootTask);
+        AddComp<HTNComponent>(uid).RootTask = new HTNCompoundTask { Task = rootTask };
 
         // The AI normally wakes up on map init, but the entity has already been map-initialized by now.
         _npc.WakeNPC(uid);

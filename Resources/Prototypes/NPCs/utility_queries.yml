@@ -284,3 +284,27 @@
     slope: 1.0
     exponent: 0.4
     xOffset: -0.02
+
+# Injured mobs that a doctor NPC could treat, most hurt first.
+- type: utilityQuery
+  id: DoctorPatients
+  query:
+    - !type:ComponentQuery
+      components:
+        - type: Damageable
+        - type: MobState
+  considerations:
+    - !type:TargetIsDeadCon
+      curve: !type:InverseBoolCurve
+    # Scores 0 for the unhurt, and more the closer to incapacitation they are.
+    - !type:TargetHealthCon
+      curve: !type:QuadraticCurve
+        slope: -1
+        exponent: 1
+        yOffset: 1
+        xOffset: 0
+    - !type:TargetDistanceCon
+      curve: !type:PresetCurve
+        preset: TargetDistance
+    - !type:TargetAccessibleCon
+      curve: !type:BoolCurve
