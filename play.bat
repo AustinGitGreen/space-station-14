@@ -8,7 +8,7 @@ dotnet build Content.Server --nologo -v q || goto :fail
 dotnet build Content.Client --nologo -v q || goto :fail
 
 echo Starting server...
-start "SS14 Server" /min cmd /c dotnet run --no-build --project Content.Server -- --cvar npc.crew_roundstart_count=6
+start "SS14 Server" /min cmd /c dotnet run --no-build --project Content.Server -- --cvar game.map=Box --cvar npc.crew_roundstart_count=6
 
 echo Waiting for the server to start...
 timeout /t 15 /nobreak >nul
