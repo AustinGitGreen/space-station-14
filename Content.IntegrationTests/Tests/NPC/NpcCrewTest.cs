@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Content.IntegrationTests.Fixtures;
 using Robust.UnitTesting.Pool;
 using Content.Server.Atmos;
@@ -173,24 +175,46 @@ public sealed class NpcCrewRoundstartTest : GameTest
     };
 
     /// <summary>
-    /// Checks that the configured number of NPC crew show up on the station once a round starts.
+    /// Checks that the configured number of NPC crew show up once a round starts, and that they fill the station's
+    /// open job slots, covering every department, rather than being a random pick of jobs.
     /// </summary>
     [Test]
-    public async Task CrewSpawnsAtRoundStart()
+    public async Task CrewFillsJobSlotsAtRoundStart()
     {
         var pair = Pair;
         var server = pair.Server;
+        var entMan = server.EntMan;
         var ticker = server.System<ServerGameTicker>();
 
-        server.CfgMan.SetCVar(CCVars.NPCCrewRoundstartCount, 3);
+        server.CfgMan.SetCVar(CCVars.NPCCrewRoundstartCount, 20);
 
         await server.WaitPost(() => ticker.StartRound());
         await pair.RunSeconds(10);
 
         await server.WaitAssertion(() =>
         {
-            Assert.That(server.EntMan.Count<NpcCrewComponent>(), Is.EqualTo(3));
-            Assert.That(server.EntMan.Count<HTNComponent>(), Is.GreaterThanOrEqualTo(3));
+            var jobs = new List<string>();
+            var query = entMan.EntityQueryEnumerator<NpcCrewComponent>();
+            while (query.MoveNext(out _, out var crew))
+            {
+                Assert.That(crew.Job, Is.Not.Null);
+                jobs.Add(crew.Job!.Value.Id);
+            }
+
+            Assert.That(jobs, Has.Count.EqualTo(20));
+
+            // Players can always take the captain's seat.
+            Assert.That(jobs, Has.None.EqualTo("Captain"));
+
+            // The jobs every department relies on come first.
+            Assert.That(jobs, Does.Contain("StationEngineer"));
+            Assert.That(jobs, Does.Contain("MedicalDoctor"));
+            Assert.That(jobs, Does.Contain("SecurityOfficer"));
+            Assert.That(jobs, Does.Contain("Chef"));
+
+            // Slots are not exceeded, and jobs are spread out rather than doubled up on.
+            Assert.That(jobs.Count(j => j == "Chef"), Is.LessThanOrEqualTo(1), "The station only has one chef slot.");
+            Assert.That(jobs.Distinct().Count(), Is.GreaterThanOrEqualTo(15));
         });
     }
 }
