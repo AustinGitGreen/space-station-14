@@ -177,6 +177,32 @@ public sealed partial class HealingSystem : EntitySystem
             args.Handled = true;
     }
 
+    /// <summary>
+    /// Whether using this healing item on the target would actually heal something right now.
+    /// Checks the same conditions as using it, minus reach.
+    /// </summary>
+    public bool CanHeal(Entity<HealingComponent?> healing, EntityUid target)
+    {
+        if (!Resolve(healing, ref healing.Comp, false)
+            || !TryComp<DamageableComponent>(target, out var damageable)
+            || !TryComp<InjurableComponent>(target, out var injurable))
+        {
+            return false;
+        }
+
+        if (healing.Comp.DamageContainers is not null &&
+            injurable.DamageContainer is not null &&
+            !healing.Comp.DamageContainers.Contains(injurable.DamageContainer.Value))
+        {
+            return false;
+        }
+
+        if (TryComp<StackComponent>(healing, out var stack) && stack.Count < 1)
+            return false;
+
+        return HasDamage((healing.Owner, healing.Comp), (target, damageable));
+    }
+
     private bool TryHeal(Entity<HealingComponent> healing, Entity<DamageableComponent?> target, EntityUid user)
     {
         if (!Resolve(target, ref target.Comp, false))

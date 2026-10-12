@@ -1,0 +1,65 @@
+# Root behavior for NPC crew (see NpcCrewSystem).
+# Branches are tried top to bottom and the first one whose preconditions pass wins, so
+# job behaviors (repair damage, cook food, heal the wounded, respond to crime) belong above the idle fallback.
+- type: htnCompound
+  id: NpcCrewCompound
+  branches:
+    - tasks:
+        - !type:HTNCompoundTask
+          task: IdleCompound
+
+# Doctors treat injured crew, then go back to wandering.
+- type: htnCompound
+  id: NpcDoctorCompound
+  branches:
+    - tasks:
+        - !type:HTNCompoundTask
+          task: DoctorTreatPatientCompound
+    - tasks:
+        - !type:HTNCompoundTask
+          task: IdleCompound
+
+- type: htnCompound
+  id: DoctorTreatPatientCompound
+  branches:
+    - tasks:
+        - !type:HTNPrimitiveTask
+          operator: !type:UtilityOperator
+            proto: DoctorPatients
+            returnType: EnumerableDescending
+        # Picks the most hurt patient the doctor has a suitable healing item for.
+        - !type:HTNPrimitiveTask
+          operator: !type:PickPatientToHealOperator
+        - !type:HTNPrimitiveTask
+          operator: !type:EquipHealingItemOperator
+        - !type:HTNCompoundTask
+          task: DoctorGetInRangeCompound
+        - !type:HTNCompoundTask
+          task: DoctorHealCompound
+
+- type: htnCompound
+  id: DoctorGetInRangeCompound
+  branches:
+    - preconditions:
+        - !type:TargetInRangePrecondition
+          invert: true
+          targetKey: Target
+          rangeKey: InteractRange
+      tasks:
+        - !type:HTNPrimitiveTask
+          operator: !type:MoveToOperator
+            pathfindInPlanning: false
+
+    - tasks:
+        - !type:HTNPrimitiveTask
+          operator: !type:NoOperator
+
+# Should only be called when in range.
+- type: htnCompound
+  id: DoctorHealCompound
+  branches:
+    - tasks:
+        - !type:HTNPrimitiveTask
+          operator: !type:InteractWithOperator
+            expectDoAfter: true
+            targetKey: Target
